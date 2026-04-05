@@ -1,0 +1,42 @@
+=================================================
+Diabetic Retinopathy Classification Dashboard - Pipeline Overview
+=================================================
+
+The application consists of a hybrid deep-learning architecture utilizing convolutional models coupled with neuro-symbolic local Language Models (LLM) for deterministic patient communication. 
+
+-----------------------------
+1. Model Inference (Image Parsing)
+-----------------------------
+- Preprocessing: Standard PyTorch pipeline resizing patches to (224, 224), normalizing channels, and packaging as a flat tensor.
+- Vision Model: EfficientNet-B0 (Timm) with a fully connected head replacing the standard Imagenet classes with 5 progressive severity stages (No DR, Mild, Moderate, Severe, Proliferative).
+- Calibration (Fixed): Logits are manipulated prior to Softmax using a Temperature Scaling Factor (T=2.0). This intentionally compresses extreme outliers, ensuring probabilities remain physically realistic (preventing perpetual 100% false-confidence flags common in standalone neural nets).
+
+-----------------------------
+2. Localized Explainability (Grad-CAM++)
+-----------------------------
+- GradCAM++ intercepts the gradient responses specifically at the terminal convolution block.
+- Differs from generic GradCAM by introducing multi-lesion weighted averages, exposing extremely localized structural features instead of large blurry halos.
+- A secondary spatial mask evaluates exactly which patches breach an activation threshold (0.6).
+
+-----------------------------
+3. Deterministic Lesion Quantifier (Src: lesion_score.py)
+-----------------------------
+- Strips the neural net's spatial array gradients into hard geometric constraints.
+- Emits bounding parameters explicitly calculating:
+  * Intensity %
+  * Number of Localized Clusters (connected components CV logic) 
+  * Location (checks boolean overlap onto the macular perimeter vs peripheral arcades)
+- Outputs a formatted JSON object representing ground truth severity.
+
+-----------------------------
+4. Controlled LLM Formulation (Src: explanation.py)
+-----------------------------
+- Binds standard rule-based reporting arrays alongside HuggingFace `google/flan-t5-small` in local mode.
+- Locks Temperature heavily towards 0 (T=0.1) explicitly blocking the generative engine from inventing external clinical contexts.
+- Contains an active fallback mechanism checking if the LLM output explicitly references the JSON parameters mathematically (e.g. Area %). If not, the engine rejects the sentence and triggers the deterministic structural fallback.
+
+-----------------------------
+5. Report Generation & Presentation
+-----------------------------
+- All elements feed into a Plotly + Streamlit presentation array (Cards, Guages, Binary Mask overlays).
+- The Python `fpdf2` package compiles the original image, extracted structural heatmaps, localized confidence graphs, and the strictly formulated LLM output strings into a downloadable 1-page clinical brief locally.

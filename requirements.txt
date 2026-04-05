@@ -1,0 +1,15 @@
+streamlit==1.32.2
+torch
+torchvision
+timm
+opencv-python
+numpy
+Pillow
+matplotlib
+grad-cam
+plotly
+fpdf2
+transformers
+accelerate
+sentencepiece
+
